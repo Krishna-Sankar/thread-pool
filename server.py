@@ -49,6 +49,10 @@ class Worker(Thread):
         self.conn = None
         self.id = id
 
+    def constructReply(self, data):
+        reply = "HELO {0}\nIP:{1}\nPort:{2}\nStudentID:{3}\n".format(data, socket.gethostbyname(socket.gethostname()), PORT, 16336617)
+        return reply
+
     def run(self):
         while not self.pool.killRequested:
             # Try to get a client
@@ -72,9 +76,9 @@ class Worker(Thread):
             print "Thread {0} received data {1}".format(self.id, data)
             if data == "KILL_SERVICE\n":
                 self.pool.kill()
-            elif data == "HELO text\n":
+            elif data.startswith("HELO "):
                 try:
-                    self.conn.send(defaultReply)
+                    self.conn.send(self.constructReply(data[5:].rstrip()))
                 except IOError as e:
                     # Client unreachable, nothing to be done
                     pass
@@ -90,7 +94,6 @@ class Worker(Thread):
 
 print "--- Preparing thread pool..."
 workerPool = Pool()
-defaultReply = "HELO text\nIP:{0}\nPort:{1}\nStudentID:{2}\n".format(socket.gethostbyname(socket.gethostname()), PORT, 16336617)
 
 print "--- Creating CTRL-C signal handler..."
 def signalHandler(signal, frame):

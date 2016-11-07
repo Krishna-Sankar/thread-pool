@@ -18,7 +18,7 @@ except IOError as e:
 
 # Send appropriate message
 if (sys.argv[1]=="H"):
-	serverSocket.send("HELO text\n")
+	serverSocket.send("HELO IMPRESSIVE_TEST\n")
 	data = serverSocket.recv(2048)
 	print "Client received data:", data
 else:
