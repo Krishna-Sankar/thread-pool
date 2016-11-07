@@ -5,25 +5,56 @@ if (len(sys.argv) < 2):
 	print "Server usage: python server.py PORT"
 	sys.exit(0)
 
-NB_THREADS = 5
+MIN_THREADS = 4 # Minimum number of workers at start and at any point
+MAX_THREADS = 32 # Maximum number of workers
+TOLERANCE = 4 # Minimum difference before resizing the pool, to prevent constant resizing (inertia)
+
 PORT = int(sys.argv[1])
 
 class Pool():
     def __init__(self):
-        self.lockBusy = threading.Lock()
         self.lockClients = threading.Lock()
         self.clients = []
         self.workers = []
-        self.busy = 0
+        self.threadCounter = 0
         self.killRequested = False
-        for counter in range(NB_THREADS):
-            self.workers.append(Worker(self, counter))
+        for counter in range(MIN_THREADS):
+            self.workers.append(Worker(self, self.threadCounter))
             self.workers[counter].start()
+            self.threadCounter += 1
+
+    def killWorker(self, worker):
+        if len(self.workers) <= MIN_THREADS:
+            return True
+        if self.killedSoFar >= self.maxKill:
+            return False
+        if worker.conn is None:
+            worker.useless = True # This thread will eventually die now
+            self.killedSoFar += 1
+            return True
+        return False
 
     def assignClient(self, conn):
-        print "Pool has been asked to append a client to the task list"
         self.lockClients.acquire()
         self.clients.append(conn)
+
+        # Maybe our workers pool needs to be resized, and we need the lock to do so
+        difference = len(self.clients) - len(self.workers)
+        if abs(difference) > TOLERANCE:
+            if difference > 0:
+                # Spawn workers
+                for counter in range(difference):
+                    if len(self.workers) >= MAX_THREADS:
+                        break
+                    self.workers.append(Worker(self, self.threadCounter))
+                    self.workers[-1].start()
+                    self.threadCounter += 1
+            else:
+                # Kill workers
+                self.maxKill = abs(difference)
+                self.killedSoFar = 0
+                self.workers = [w for w in self.workers if not self.killWorker(w)]
+
         self.lockClients.release()
 
     def kill(self):
@@ -43,7 +74,7 @@ class Server(Thread):
             # At most 4 queued clients
             self.server.listen(4)
             (conn, (ip,port)) = self.server.accept()
-            print "Server received client connection"
+            print "Server received client connection and added it to queue"
             self.pool.assignClient(conn)
 
 class Worker(Thread):
@@ -52,13 +83,14 @@ class Worker(Thread):
         self.pool = pool
         self.conn = None
         self.id = id
+        self.useless = False
 
     def constructReply(self, data):
         reply = "HELO {0}\nIP:{1}\nPort:{2}\nStudentID:{3}\n".format(data, socket.gethostname(), PORT, 16336617)
         return reply
 
     def run(self):
-        while not self.pool.killRequested:
+        while not (self.pool.killRequested or self.useless):
             # Try to get a client
             self.pool.lockClients.acquire()
             if len(self.pool.clients) > 0:
@@ -70,14 +102,9 @@ class Worker(Thread):
                 continue
 
             print "Thread {0} fetched a client".format(self.id)
-            # If we have a client, indicate pool that we're busy
-            self.pool.lockBusy.acquire()
-            self.pool.busy += 1
-            self.pool.lockBusy.release()
-
             # Serve client
             data = self.conn.recv(2048)
-            print "Thread {0} received data {1}".format(self.id, data)
+            print "Thread {0} received data {1}".format(self.id, data.rstrip())
             if data == "KILL_SERVICE\n":
                 self.pool.kill()
             elif data.startswith("HELO "):
@@ -86,14 +113,10 @@ class Worker(Thread):
                 except IOError as e:
                     # Client unreachable, nothing to be done
                     pass
-
+            print "Thread {0} closing client socket".format(self.id)
             self.conn.close()
             self.conn = None
 
-            # Indicate pool that we're done
-            self.pool.lockBusy.acquire()
-            self.pool.busy -= 1
-            self.pool.lockBusy.release()
         print "Thread {0} dying".format(self.id)
 
 print "--- Preparing thread pool..."
@@ -101,7 +124,7 @@ workerPool = Pool()
 
 print "--- Creating CTRL-C signal handler..."
 def signalHandler(signal, frame):
-    print "Server received CTRL-C"
+    print "Server received CTRL-C, nuking all threads"
     workerPool.kill()
 signal.signal(signal.SIGINT, signalHandler)
 
