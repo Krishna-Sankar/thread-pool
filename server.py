@@ -74,8 +74,13 @@ class Server(Thread):
             # At most 4 queued clients
             self.server.listen(4)
             (conn, (ip,port)) = self.server.accept()
-            print "Server received client connection and added it to queue"
-            self.pool.assignClient(conn)
+            # If the server is already overloaded, reject this client
+            if len(self.pool.clients) > MAX_THREADS:
+                print "Burnout! Server rejected client"
+                conn.close()
+            else:
+                print "Server received client connection and added it to queue"
+                self.pool.assignClient(conn)
 
 class Worker(Thread):
     def __init__(self, pool, id):
