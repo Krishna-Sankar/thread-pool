@@ -2,16 +2,17 @@ import socket, errno
 from threading import Thread
 
 class Client(Thread):
-    def __init__(self):
+    def __init__(self, conn):
         Thread.__init__(self)
+        self.conn = conn
 
     def run(self):
         while True:
-            data = conn.recv(2048)
+            data = self.conn.recv(2048)
             if data != "":
                 print "Server received data:", data
             try:
-                conn.send("pong")
+                self.conn.send("pong")
             except IOError as e:
                 print "Client unreachable"
                 break
@@ -27,7 +28,7 @@ while True:
     # At most one queued client
     server.listen(1)
     (conn, (ip,port)) = server.accept()
-    clientThread = Client()
+    clientThread = Client(conn)
     clientThread.start()
     pool.append(clientThread)
 
