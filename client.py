@@ -1,11 +1,11 @@
 import socket, sys
 
-if (len(sys.argv) < 2):
-	print "Client usage: python client.py H|K"
+if (len(sys.argv) < 4):
+	print "Client usage: python client.py H|K IP PORT"
 	sys.exit(0)
 
-HOST = socket.gethostname()
-PORT = 3000
+HOST = sys.argv[2]
+PORT = int(sys.argv[3])
 
 serverSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
