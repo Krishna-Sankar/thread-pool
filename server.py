@@ -1,4 +1,4 @@
-import socket, time, threading, sys, signal
+import socket, time, threading, sys, signal, errno
 from threading import Thread
 
 if (len(sys.argv) < 2):
@@ -35,6 +35,7 @@ class Pool():
         return False
 
     def assignClient(self, conn):
+        conn.setblocking(0)
         self.lockClients.acquire()
         self.clients.append(conn)
 
@@ -107,17 +108,28 @@ class Worker(Thread):
                 continue
 
             print "Thread {0} fetched a client".format(self.id)
+
             # Serve client
-            data = self.conn.recv(2048)
-            print "Thread {0} received data {1}".format(self.id, data.rstrip())
-            if data == "KILL_SERVICE\n":
-                self.pool.kill()
-            elif data.startswith("HELO "):
+            while not (self.pool.killRequested or self.useless):
                 try:
-                    self.conn.send(self.constructReply(data[5:].rstrip()))
-                except IOError as e:
-                    # Client unreachable, nothing to be done
-                    pass
+                    data = self.conn.recv(2048)
+                    print "Thread {0} received data {1}".format(self.id, data.rstrip())
+                    if data == "KILL_SERVICE\n":
+                        self.pool.kill()
+                    elif data.startswith("HELO "):
+                        while not (self.pool.killRequested or self.useless):
+                            try:
+                                self.conn.send(self.constructReply(data[5:].rstrip()))
+                                break
+                            except socket.error as e:
+                                if e.errno == errno.ECONNRESET:
+                                    break
+                    elif data == "":
+                        break
+                except socket.error as e2:
+                    if e2.errno == errno.ECONNRESET:
+                        break
+
             print "Thread {0} closing client socket".format(self.id)
             self.conn.close()
             self.conn = None
