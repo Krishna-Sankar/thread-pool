@@ -1,6 +1,6 @@
 # Multithreaded Server
 
-This is the 2st assignment for CS4032 (Distributed Systems). The goal was to develop the skeleton for a multithreaded server supporting dynamic thread pooling and responding to a few simple messages over TCP sockets.
+This is the 2nd assignment for CS4032 (Distributed Systems). The goal was to develop the skeleton for a multithreaded server supporting dynamic thread pooling and responding to a few simple messages over TCP sockets.
 
 My information:
 
