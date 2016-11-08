@@ -1,4 +1,4 @@
-import socket, sys
+import socket, sys, time
 
 if (len(sys.argv) < 4):
 	print "Client usage: python client.py H|K IP PORT"
@@ -21,6 +21,7 @@ if (sys.argv[1]=="H"):
 	serverSocket.send("HELO IMPRESSIVE_TEST\n")
 	data = serverSocket.recv(2048)
 	print "Client received data:", data
+	time.sleep(5)
 else:
 	serverSocket.send("KILL_SERVICE\n")
 
