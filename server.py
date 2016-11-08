@@ -24,8 +24,8 @@ class Pool():
             self.threadCounter += 1
 
     def killWorker(self, worker):
-        if len(self.workers) <= MIN_THREADS:
-            return True
+        if (len(self.workers) - self.killedSoFar)  <= MIN_THREADS:
+            return False
         if self.killedSoFar >= self.maxKill:
             return False
         if worker.conn is None:
@@ -99,7 +99,7 @@ class Worker(Thread):
         while not (self.pool.killRequested or self.useless):
             # Try to get a client
             self.pool.lockClients.acquire()
-            if len(self.pool.clients) > 0:
+            if (len(self.pool.clients) > 0 and not (self.pool.killRequested or self.useless)):
                 self.conn = self.pool.clients.pop(0)
             self.pool.lockClients.release()
 
