@@ -40,7 +40,8 @@ python client.py H|K IP PORT
 ```
 
 H corresponds to a simple *HELO* message, and K corresponds to the *KILL_SERVICE* message.
-Please see the subject for more details.
+When receiving a *HELO* response, the client will sleep for a while before closing the socket to use server resources at least a bit.
+Please see the subject for more details on messages.
 
 ## Implementation
 
